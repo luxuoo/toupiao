@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小组抽签加分小程序</title>
+    <title>小组抽签加分</title>
     <style>
         * {
             margin: 0;
@@ -33,7 +33,6 @@
             font-size: 2.5rem;
         }
 
-        /* 点名区域样式 */
         .call-area {
             margin: 40px 0;
             padding: 30px;
@@ -109,22 +108,24 @@
             background-color: #d35400;
         }
 
-        .btn-vote-screen {
+        .btn-vote {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             margin: 10px 0 30px;
-            padding: 14px 36px;
-            font-size: 1.2rem;
+            padding: 16px 48px;
+            font-size: 1.4rem;
             border: none;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
-        .btn-vote-screen:hover {
+        .btn-vote:hover {
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
             transform: translateY(-2px);
         }
 
-        /* 分数排行区域样式 */
         .rank-area {
             margin-top: 40px;
             display: none;
@@ -165,7 +166,6 @@
             color: #e74c3c;
         }
 
-        /* 响应式适配 */
         @media (max-width: 768px) {
             .student-name {
                 font-size: 2.5rem;
@@ -189,9 +189,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>小组抽签加分小程序</h1>
+        <h1>小组抽签加分</h1>
 
-        <!-- 随机点名区域 -->
         <div class="call-area">
             <div class="call-text" id="callText">点击下方按钮开始随机点名</div>
             <div class="student-name" id="studentName">——</div>
@@ -202,18 +201,15 @@
             <button class="btn btn-add" id="addScoreBtn" disabled>+1分</button>
         </div>
 
-        <!-- 分数排行控制 -->
         <button class="btn btn-rank" id="rankBtn">查看全班加分排行</button>
 
-        <!-- 跳转到投票大屏 -->
+        <!-- 进入投票 -->
         <div style="margin-top:20px;">
-            <a href="/screen.html" target="_blank" style="text-decoration:none;">
-                <button class="btn btn-vote-screen">📊 进入投票大屏</button>
+            <a href="/vote.html" style="text-decoration:none;">
+                <button class="btn-vote">🗳️ 进入投票</button>
             </a>
-            <p style="color:#999;font-size:0.85rem;margin-top:6px;">点击进入实时投票展示大屏（需先启动服务器）</p>
         </div>
 
-        <!-- 分数排行展示区域 -->
         <div class="rank-area" id="rankArea">
             <h2 class="rank-title">全班加分排行（按分数降序）</h2>
             <div class="score-list" id="scoreList"></div>
@@ -221,18 +217,15 @@
     </div>
 
     <script>
-        // 1. 小组名单
         const studentList = [
             '社区画像组', '智慧门禁组', '智能服务组', '信息归仓组'
         ];
 
-        // 2. 初始化学生分数对象（所有学生初始分数为0）
         let studentScores = {};
         studentList.forEach(name => {
             studentScores[name] = 0;
         });
 
-        // 3. 获取页面元素
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
         const addScoreBtn = document.getElementById('addScoreBtn');
@@ -242,12 +235,10 @@
         const rankArea = document.getElementById('rankArea');
         const scoreList = document.getElementById('scoreList');
 
-        // 4. 全局变量
-        let rollInterval = null; // 点名滚动定时器
-        let isRolling = false;    // 是否正在滚动点名
-        let currentStudent = '';  // 当前被点到的学生
+        let rollInterval = null;
+        let isRolling = false;
+        let currentStudent = '';
 
-        // 5. 开始点名：随机滚动学生姓名
         startBtn.addEventListener('click', () => {
             if (isRolling) return;
             isRolling = true;
@@ -256,7 +247,6 @@
             callText.textContent = '正在随机抽取...';
             studentName.style.color = '#3498db';
 
-            // 开启定时器，每隔100毫秒随机切换学生姓名
             rollInterval = setInterval(() => {
                 const randomIndex = Math.floor(Math.random() * studentList.length);
                 currentStudent = studentList[randomIndex];
@@ -264,7 +254,6 @@
             }, 100);
         });
 
-        // 6. 停止点名：锁定结果，激活加分按钮
         stopBtn.addEventListener('click', () => {
             clearInterval(rollInterval);
             isRolling = false;
@@ -275,22 +264,18 @@
             studentName.style.color = '#e74c3c';
         });
 
-        // 7. 为当前学生加分
         addScoreBtn.addEventListener('click', () => {
             if (!currentStudent) return;
             studentScores[currentStudent]++;
-            // 加分后给出视觉反馈（短暂变色）
             addScoreBtn.style.backgroundColor = '#1abc9c';
             setTimeout(() => {
                 addScoreBtn.style.backgroundColor = '#27ae60';
             }, 300);
-            // 如果排行区域已打开，实时更新排行
             if (rankArea.style.display === 'block') {
                 renderScoreList();
             }
         });
 
-        // 8. 展开/收起分数排行
         rankBtn.addEventListener('click', () => {
             if (rankArea.style.display === 'block') {
                 rankArea.style.display = 'none';
@@ -298,23 +283,20 @@
             } else {
                 rankArea.style.display = 'block';
                 rankBtn.textContent = '收起加分排行';
-                renderScoreList(); // 渲染分数列表
+                renderScoreList();
             }
         });
 
-        // 9. 渲染分数列表（按分数降序排序，分数相同按姓名排序）
         function renderScoreList() {
-            scoreList.innerHTML = ''; // 清空原有内容
-            // 转换为数组并排序：先按分数降序，再按姓名升序
+            scoreList.innerHTML = '';
             const sortedStudents = Object.entries(studentScores)
                 .sort((a, b) => {
                     if (b[1] !== a[1]) {
-                        return b[1] - a[1]; // 分数高的在前
+                        return b[1] - a[1];
                     } else {
-                        return a[0].localeCompare(b[0], 'zh-CN'); // 分数相同，中文姓名升序
+                        return a[0].localeCompare(b[0], 'zh-CN');
                     }
                 });
-            // 遍历生成每个学生的分数项
             sortedStudents.forEach(([name, score]) => {
                 const scoreItem = document.createElement('div');
                 scoreItem.className = 'score-item';

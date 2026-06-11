@@ -18,8 +18,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-// Serve existing static HTML files from root
-app.use(express.static(__dirname));
+
+// Root redirect to index
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Attach io to request for real-time push
 app.use((req, res, next) => {
@@ -53,6 +56,7 @@ initDatabase().then(() => {
     console.log(`\n  ========================================`);
     console.log(`    投票系统已启动`);
     console.log(`    本地访问: http://localhost:${PORT}`);
+    console.log(`    点名页面: http://localhost:${PORT}/`);
     console.log(`    投票页面: http://localhost:${PORT}/vote.html`);
     console.log(`    大屏展示: http://localhost:${PORT}/screen.html`);
     console.log(`    后台管理: http://localhost:${PORT}/admin.html`);

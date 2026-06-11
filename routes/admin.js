@@ -22,20 +22,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// Auth middleware
-function authMiddleware(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.json({ code: 401, message: '未登录' });
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.adminId = decoded.id;
-    next();
-  } catch {
-    res.json({ code: 401, message: '登录已过期' });
-  }
-}
+// No auth middleware - access is hidden via UI only
 
-// Admin login
+// Admin login (kept for compatibility)
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -52,7 +41,7 @@ router.post('/login', async (req, res) => {
 });
 
 // Get all activities
-router.get('/activities', authMiddleware, async (req, res) => {
+router.get('/activities', async (req, res) => {
   try {
     const activities = await all('SELECT * FROM activities ORDER BY id DESC');
     for (const act of activities) {
@@ -68,7 +57,7 @@ router.get('/activities', authMiddleware, async (req, res) => {
 });
 
 // Create activity
-router.post('/activity', authMiddleware, async (req, res) => {
+router.post('/activity', async (req, res) => {
   try {
     const { name, description } = req.body;
     if (!name) return res.json({ code: 400, message: '请输入活动名称' });
@@ -83,7 +72,7 @@ router.post('/activity', authMiddleware, async (req, res) => {
 });
 
 // Update activity
-router.put('/activity/:id', authMiddleware, async (req, res) => {
+router.put('/activity/:id', async (req, res) => {
   try {
     const { name, description } = req.body;
     await run(
@@ -97,7 +86,7 @@ router.put('/activity/:id', authMiddleware, async (req, res) => {
 });
 
 // Delete activity
-router.delete('/activity/:id', authMiddleware, async (req, res) => {
+router.delete('/activity/:id', async (req, res) => {
   try {
     await run('DELETE FROM activities WHERE id = ?', [req.params.id]);
     res.json({ code: 0, message: '删除成功' });
@@ -107,7 +96,7 @@ router.delete('/activity/:id', authMiddleware, async (req, res) => {
 });
 
 // Update activity status (start/pause/end)
-router.put('/activity/:id/status', authMiddleware, async (req, res) => {
+router.put('/activity/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
     if (!['pending', 'voting', 'paused', 'ended'].includes(status)) {
@@ -129,7 +118,7 @@ router.put('/activity/:id/status', authMiddleware, async (req, res) => {
 });
 
 // Get groups for an activity
-router.get('/activity/:id/groups', authMiddleware, async (req, res) => {
+router.get('/activity/:id/groups', async (req, res) => {
   try {
     const groups = await all(
       'SELECT * FROM groups WHERE activity_id = ? ORDER BY sort_order ASC',
@@ -142,7 +131,7 @@ router.get('/activity/:id/groups', authMiddleware, async (req, res) => {
 });
 
 // Add group
-router.post('/activity/:id/group', authMiddleware, async (req, res) => {
+router.post('/activity/:id/group', async (req, res) => {
   try {
     const { name, description, sort_order } = req.body;
     if (!name) return res.json({ code: 400, message: '请输入组名' });
@@ -162,7 +151,7 @@ router.post('/activity/:id/group', authMiddleware, async (req, res) => {
 });
 
 // Update group
-router.put('/group/:id', authMiddleware, async (req, res) => {
+router.put('/group/:id', async (req, res) => {
   try {
     const { name, description, sort_order } = req.body;
     await run(
@@ -176,7 +165,7 @@ router.put('/group/:id', authMiddleware, async (req, res) => {
 });
 
 // Delete group
-router.delete('/group/:id', authMiddleware, async (req, res) => {
+router.delete('/group/:id', async (req, res) => {
   try {
     const group = await get('SELECT image FROM groups WHERE id = ?', [req.params.id]);
     if (group && group.image) {
@@ -191,7 +180,7 @@ router.delete('/group/:id', authMiddleware, async (req, res) => {
 });
 
 // Upload group image
-router.post('/group/:id/image', authMiddleware, upload.single('image'), async (req, res) => {
+router.post('/group/:id/image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.json({ code: 400, message: '请选择图片' });
     const imageUrl = `/uploads/${req.file.filename}`;
@@ -209,7 +198,7 @@ router.post('/group/:id/image', authMiddleware, upload.single('image'), async (r
 });
 
 // Clear votes for an activity
-router.delete('/activity/:id/votes', authMiddleware, async (req, res) => {
+router.delete('/activity/:id/votes', async (req, res) => {
   try {
     const result = await run('DELETE FROM votes WHERE activity_id = ?', [req.params.id]);
     if (req.io) {
@@ -222,7 +211,7 @@ router.delete('/activity/:id/votes', authMiddleware, async (req, res) => {
 });
 
 // Export vote results as JSON
-router.get('/activity/:id/export', authMiddleware, async (req, res) => {
+router.get('/activity/:id/export', async (req, res) => {
   try {
     const activity = await get('SELECT * FROM activities WHERE id = ?', [req.params.id]);
     const groups = await all('SELECT * FROM groups WHERE activity_id = ? ORDER BY sort_order', [req.params.id]);
@@ -247,7 +236,7 @@ router.get('/activity/:id/export', authMiddleware, async (req, res) => {
 });
 
 // Get dashboard stats
-router.get('/stats', authMiddleware, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     const totalActivities = await get('SELECT COUNT(*) as count FROM activities');
     const totalVotes = await get('SELECT COUNT(*) as count FROM votes');
@@ -274,7 +263,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
 });
 
 // Change admin password
-router.put('/password', authMiddleware, async (req, res) => {
+router.put('/password', async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
     const admin = await get('SELECT * FROM admins WHERE id = ?', [req.adminId]);
