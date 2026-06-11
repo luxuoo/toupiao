@@ -6,7 +6,7 @@ const { run, get, all } = require('../database');
 router.get('/activity', async (req, res) => {
   try {
     const activity = await get(
-      'SELECT * FROM activities WHERE status != "ended" ORDER BY id DESC LIMIT 1'
+      `SELECT * FROM activities WHERE status != 'ended' ORDER BY id DESC LIMIT 1`
     );
     if (!activity) {
       return res.json({ code: 404, message: '暂无活动' });
