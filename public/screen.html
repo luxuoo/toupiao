@@ -26,7 +26,6 @@
       gap: 16px;
     }
 
-    /* Header */
     .screen-header {
       text-align: center;
       padding: 10px 0;
@@ -42,6 +41,7 @@
     .header-stats {
       display: flex;
       justify-content: center;
+      align-items: center;
       gap: 40px;
       margin-top: 10px;
     }
@@ -72,7 +72,26 @@
     .status-badge.paused { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
     .status-badge.ended { background: #fff2f0; color: #cf1322; border: 1px solid #ffa39e; }
 
-    /* Main content */
+    .control-btns {
+      display: flex;
+      gap: 8px;
+    }
+    .ctrl-btn {
+      padding: 6px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ctrl-btn-start { background: #52c41a; color: #fff; }
+    .ctrl-btn-start:hover { background: #389e0d; }
+    .ctrl-btn-pause { background: #faad14; color: #fff; }
+    .ctrl-btn-pause:hover { background: #d48806; }
+    .ctrl-btn-end { background: #ff4d4f; color: #fff; }
+    .ctrl-btn-end:hover { background: #cf1322; }
+
     .screen-body {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -93,12 +112,8 @@
       font-weight: 600;
       color: #667eea;
       margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
 
-    /* Ranking */
     .rank-list { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
     .rank-item {
       display: flex;
@@ -173,7 +188,6 @@
 
     .chart-wrap { flex: 1; position: relative; min-height: 0; }
 
-    /* QR Code panel */
     .qr-panel {
       display: flex;
       flex-direction: column;
@@ -191,7 +205,6 @@
       color: #333;
       text-align: center;
     }
-    .qr-tip .icon { font-size: 28px; display: block; margin-bottom: 4px; }
     .qr-hint {
       font-size: 13px;
       color: #999;
@@ -242,23 +255,24 @@
         <div class="stat-item">
           <span class="status-badge" id="statusBadge">加载中</span>
         </div>
+        <div class="control-btns" id="controlBtns"></div>
       </div>
     </div>
 
     <div class="screen-body">
       <div class="panel">
-        <div class="panel-title">🏆 实时排行榜</div>
+        <div class="panel-title">实时排行榜</div>
         <div class="rank-list" id="rankList">
           <div style="text-align:center;padding:40px;color:#999;">加载中...</div>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:20px;">
         <div class="panel" style="flex:1;">
-          <div class="panel-title">📊 得票分布</div>
+          <div class="panel-title">得票分布</div>
           <div class="chart-wrap"><canvas id="barChart"></canvas></div>
         </div>
         <div class="panel qr-panel">
-          <div class="qr-tip"><span class="icon">📱</span>扫码投票</div>
+          <div class="qr-tip">扫码投票</div>
           <canvas id="qrCanvas" width="200" height="200"></canvas>
           <div class="qr-hint">使用手机扫描二维码参与投票</div>
         </div>
@@ -266,20 +280,46 @@
     </div>
   </div>
 
-  <button class="fullscreen-btn" onclick="toggleFullscreen()">⛶ 全屏</button>
+  <button class="fullscreen-btn" onclick="toggleFullscreen()">全屏</button>
 
   <script>
     const API = '/api';
+    const ADMIN_API = '/admin';
     let currentActivity = null;
     let barChart = null;
     let previousRanks = {};
 
     const chartColors = ['#667eea','#764ba2','#f59e0b','#10b981','#ef4444','#06b6d4','#ec4899','#8b5cf6','#14b8a6','#f97316','#84cc16','#6366f1'];
-    const statusMap = { pending: '⏳ 未开始', voting: '🟢 进行中', paused: '⏸ 已暂停', ended: '🔴 已结束' };
+    const statusMap = { pending: '未开始', voting: '进行中', paused: '已暂停', ended: '已结束' };
 
     function toggleFullscreen() {
       if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
       else document.exitFullscreen();
+    }
+
+    function renderControlBtns(status) {
+      const container = document.getElementById('controlBtns');
+      if (status === 'pending' || status === 'paused') {
+        container.innerHTML = '<button class="ctrl-btn ctrl-btn-start" onclick="changeStatus(\'voting\')">开始投票</button>';
+      } else if (status === 'voting') {
+        container.innerHTML = '<button class="ctrl-btn ctrl-btn-pause" onclick="changeStatus(\'paused\')">暂停</button>' +
+          '<button class="ctrl-btn ctrl-btn-end" onclick="changeStatus(\'ended\')">结束</button>';
+      } else {
+        container.innerHTML = '';
+      }
+    }
+
+    async function changeStatus(status) {
+      if (!currentActivity) return;
+      try {
+        const res = await fetch(`${ADMIN_API}/activity/${currentActivity.id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+        const json = await res.json();
+        if (json.code === 0) loadData();
+      } catch (err) { console.error('状态更新失败:', err); }
     }
 
     async function loadQRCode(activityId) {
@@ -303,6 +343,7 @@
         const badge = document.getElementById('statusBadge');
         badge.textContent = statusMap[currentActivity.status] || currentActivity.status;
         badge.className = 'status-badge ' + currentActivity.status;
+        renderControlBtns(currentActivity.status);
         loadQRCode(currentActivity.id);
         const resultsRes = await fetch(`${API}/results/${currentActivity.id}`);
         const resultsJson = await resultsRes.json();

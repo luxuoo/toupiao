@@ -168,22 +168,22 @@
       <div class="sidebar">
         <div class="sidebar-logo"><h2>投票系统</h2></div>
         <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
-          <span class="icon">📊</span><span class="nav-text">仪表盘</span>
+          <span class="nav-text">仪表盘</span>
         </div>
         <div class="nav-item" data-page="activities" onclick="switchPage('activities')">
-          <span class="icon">📋</span><span class="nav-text">活动管理</span>
+          <span class="nav-text">活动管理</span>
         </div>
         <div class="nav-item" data-page="groups" onclick="switchPage('groups')">
-          <span class="icon">👥</span><span class="nav-text">候选组管理</span>
+          <span class="nav-text">候选组管理</span>
         </div>
         <div class="nav-item" data-page="control" onclick="switchPage('control')">
-          <span class="icon">🎮</span><span class="nav-text">投票控制</span>
+          <span class="nav-text">投票控制</span>
         </div>
         <div class="nav-item" data-page="qrcode" onclick="switchPage('qrcode')">
-          <span class="icon">📱</span><span class="nav-text">二维码</span>
+          <span class="nav-text">二维码</span>
         </div>
         <div class="nav-item" data-page="results" onclick="switchPage('results')">
-          <span class="icon">🏆</span><span class="nav-text">投票结果</span>
+          <span class="nav-text">投票结果</span>
         </div>
       </div>
 
@@ -247,9 +247,9 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" id="controlButtons"></div>
           </div>
           <div class="card">
-            <div class="card-header"><h3>⚠️ 危险操作</h3></div>
+            <div class="card-header"><h3>危险操作</h3></div>
             <p style="color:#999;font-size:13px;margin-bottom:12px;">清空投票数据将删除该活动下的所有投票记录，此操作不可恢复。</p>
-            <button class="btn btn-danger" onclick="clearVotes()">🗑 清空投票数据</button>
+            <button class="btn btn-danger" onclick="clearVotes()">清空投票数据</button>
           </div>
         </div>
 
@@ -265,8 +265,8 @@
               <canvas id="qrCanvas"></canvas>
               <div class="qr-url" id="qrUrl"></div>
               <div style="margin-top:14px;">
-                <button class="btn btn-primary" onclick="downloadQR()">📥 下载二维码</button>
-                <button class="btn btn-ghost" onclick="openVotePage()" style="margin-left:8px;">🔗 打开投票页</button>
+                <button class="btn btn-primary" onclick="downloadQR()">下载二维码</button>
+                <button class="btn btn-ghost" onclick="openVotePage()" style="margin-left:8px;">打开投票页</button>
               </div>
             </div>
           </div>
@@ -276,7 +276,7 @@
           <div class="activity-select">
             <span style="color:#666;font-size:13px;">选择活动:</span>
             <select id="resultActivitySelect" onchange="loadResults()"></select>
-            <button class="btn btn-ghost" onclick="exportResults()">📤 导出数据</button>
+            <button class="btn btn-ghost" onclick="exportResults()">导出数据</button>
           </div>
           <div class="stats-grid" id="resultStats"></div>
           <div class="card">
@@ -425,12 +425,12 @@
       if (!json.data.length) { grid.innerHTML = '<div style="color:#999;text-align:center;padding:40px;">暂无候选组</div>'; return; }
       grid.innerHTML = json.data.map(g => `
         <div class="group-card">
-          <div class="group-img">${g.image ? `<img src="${g.image}" alt="${g.name}">` : '<span class="placeholder">🎤</span>'}</div>
+          <div class="group-img">${g.image ? `<img src="${g.image}" alt="${g.name}">` : '<span class="placeholder">暂无图片</span>'}</div>
           <h4>${g.name}</h4><p>${g.description || '暂无简介'}</p>
           <div class="group-actions">
-            <button class="btn btn-ghost btn-sm" onclick="uploadImage(${g.id})">📷 上传图片</button>
-            <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id},'${encodeURIComponent(g.name)}','${encodeURIComponent(g.description||'')}')">✏️ 编辑</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id})">🗑 删除</button>
+            <button class="btn btn-ghost btn-sm" onclick="uploadImage(${g.id})">上传图片</button>
+            <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id},'${encodeURIComponent(g.name)}','${encodeURIComponent(g.description||'')}')">编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id})">删除</button>
           </div>
         </div>
       `).join('');
@@ -524,7 +524,7 @@
     async function clearVotes() {
       const actId = document.getElementById('controlActivitySelect').value;
       if (!actId) return;
-      if (!confirm('⚠️ 确定清空该活动所有投票数据？此操作不可恢复！')) return;
+      if (!confirm('确定清空该活动所有投票数据？此操作不可恢复！')) return;
       if (!confirm('再次确认：真的要清空吗？')) return;
       const json = await authFetch(`${API}/activity/${actId}/votes`, { method: 'DELETE' });
       if (json && json.code === 0) showToast(json.message);
