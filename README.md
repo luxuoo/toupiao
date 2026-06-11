@@ -44,7 +44,7 @@ npm install
 npm start
 ```
 
-访问 `http://localhost:7070`
+访问 `http://localhost:3000`（本地开发无 Nginx，直接用 3000 端口）
 
 ---
 
@@ -84,34 +84,59 @@ pm2 startup
 
 ### 4. 配置 Nginx 反向代理
 
-宝塔面板 → **网站** → **添加站点**（填域名，PHP 选纯静态）→ 站点设置 → **反向代理** → 添加：
+宝塔面板 → **网站** → **添加站点**（填域名或 IP，PHP 选纯静态）→ 站点设置 → **反向代理** → 添加：
 
 - 代理名称：`vote`
-- 目标URL：`http://127.0.0.1:7070`
+- 目标URL：`http://127.0.0.1:3000`
 
 然后点 **配置文件**，替换为：
 
 ```nginx
-location / {
-    proxy_pass http://127.0.0.1:7070;
+server {
+    listen 7070;
+    listen [::]:7070;
+    server_name 你的域名或IP;
+
+    #WEBSOCKET-SUPPORT START
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Connection $connection_upgrade;
+    #WEBSOCKET-SUPPORT END
+
+    location ^~ / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+
+    # 禁止访问敏感文件和目录
+    location ~* /(\.git|\.svn|node_modules|data)/ {
+        return 404;
+    }
+
+    access_log /www/wwwlogs/vote-system.log;
+    error_log /www/wwwlogs/vote-system.error.log;
 }
 ```
+
+> **说明**：Nginx 对外监听 **7070** 端口，Node.js 内部跑 **3000** 端口（不对外暴露），Nginx 负责转发请求和 WebSocket 支持。
 
 ### 5. 访问
 
 | 页面 | 地址 |
 |------|------|
-| 点名首页 | `http://你的域名/` |
-| 投票页面 | `http://你的域名/vote.html` |
-| 大屏展示 | `http://你的域名/screen.html` |
-| 后台管理 | `http://你的域名/admin.html` |
+| 点名首页 | `http://你的域名:7070/` |
+| 投票页面 | `http://你的域名:7070/vote.html` |
+| 大屏展示 | `http://你的域名:7070/screen.html` |
+| 后台管理 | `http://你的域名:7070/admin.html` |
 
 ---
 
