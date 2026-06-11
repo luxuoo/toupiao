@@ -185,6 +185,9 @@
         <div class="nav-item" data-page="results" onclick="switchPage('results')">
           <span class="nav-text">投票结果</span>
         </div>
+        <div class="nav-item" onclick="window.open('/screen.html','_blank')">
+          <span class="nav-text">大屏展示</span>
+        </div>
       </div>
 
       <div class="main-content">
@@ -336,8 +339,8 @@
       document.getElementById('pageTitle').textContent = pageTitles[page];
       if (page === 'dashboard') loadDashboard();
       if (page === 'activities') loadActivities();
-      if (page === 'groups') populateSelects();
-      if (page === 'control') populateSelects();
+      if (page === 'groups') { populateSelects(); loadGroups(); }
+      if (page === 'control') { populateSelects(); loadControlInfo(); }
       if (page === 'qrcode') { populateSelects(); setTimeout(generateQR, 100); }
       if (page === 'results') { populateSelects(); setTimeout(loadResults, 100); }
     }
