@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>后台管理 - 投票系统</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* Login */
+    .login-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #f0f2f5;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .login-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 40px;
+      width: 380px;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .login-box h2 { font-size: 24px; color: #333; margin-bottom: 8px; }
+    .login-box p { color: #999; font-size: 13px; margin-bottom: 24px; }
+    .login-box input {
+      width: 100%; padding: 12px 16px;
+      background: #fafafa; border: 1px solid #e8e8e8; border-radius: 10px;
+      color: #333; font-size: 14px; margin-bottom: 12px; outline: none;
+    }
+    .login-box input:focus { border-color: #667eea; }
+    .login-box .btn-login {
+      width: 100%; padding: 12px;
+      background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 10px;
+      color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .login-box .btn-login:hover { box-shadow: 0 4px 15px rgba(102,126,234,0.4); }
+    .login-error { color: #ff4d4f; font-size: 13px; margin-top: 8px; display: none; }
+
+    .admin-app { display: none; }
+    .admin-app.active { display: block; }
+
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 220px; background: #fff;
+      border-right: 1px solid #f0f0f0;
+      padding: 20px 0; flex-shrink: 0;
+      position: fixed; top: 0; bottom: 0; left: 0;
+      overflow-y: auto;
+    }
+    .sidebar-logo {
+      text-align: center; padding: 0 16px 20px;
+      border-bottom: 1px solid #f5f5f5; margin-bottom: 12px;
+    }
+    .sidebar-logo h2 { font-size: 18px; color: #667eea; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 20px; cursor: pointer; font-size: 14px;
+      color: #666; transition: all 0.2s;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover { background: #f5f7ff; color: #667eea; }
+    .nav-item.active { background: #f0f5ff; color: #667eea; border-left-color: #667eea; font-weight: 600; }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .main-content { flex: 1; margin-left: 220px; padding: 24px; }
+    .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .top-bar h1 { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+    .top-bar .right-info { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #999; }
+    .btn-logout {
+      background: #fff2f0; border: 1px solid #ffccc7; color: #ff4d4f;
+      padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    }
+    .btn-logout:hover { background: #fff1f0; }
+
+    .card {
+      background: #fff; border-radius: 14px;
+      padding: 20px; margin-bottom: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .card-header h3 { font-size: 16px; font-weight: 600; color: #333; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 8px; font-size: 13px;
+      font-weight: 500; cursor: pointer; border: 1px solid transparent;
+    }
+    .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+    .btn-primary:hover { box-shadow: 0 2px 12px rgba(102,126,234,0.4); }
+    .btn-success { background: #f6ffed; color: #389e0d; border-color: #b7eb8f; }
+    .btn-warning { background: #fffbe6; color: #d48806; border-color: #ffe58f; }
+    .btn-danger { background: #fff2f0; color: #ff4d4f; border-color: #ffccc7; }
+    .btn-ghost { background: #fff; color: #666; border-color: #d9d9d9; }
+    .btn-ghost:hover { color: #667eea; border-color: #667eea; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat-card {
+      background: #fff; border-radius: 12px; padding: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    .stat-card .label { font-size: 13px; color: #999; margin-bottom: 6px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; color: #667eea; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+    th { color: #999; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { color: #333; }
+    tr:hover td { background: #fafafa; }
+
+    .tag { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+    .tag-pending { background: #fffbe6; color: #d48806; }
+    .tag-voting { background: #f6ffed; color: #389e0d; }
+    .tag-paused { background: #fffbe6; color: #d48806; }
+    .tag-ended { background: #fff2f0; color: #cf1322; }
+
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 10px 14px;
+      background: #fafafa; border: 1px solid #e8e8e8; border-radius: 8px;
+      color: #333; font-size: 14px; outline: none;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: #667eea; background: #fff; }
+    .form-group textarea { resize: vertical; min-height: 60px; }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.3); z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #fff; border-radius: 16px; padding: 24px;
+      width: 480px; max-width: 90vw; max-height: 80vh; overflow-y: auto;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+    }
+    .modal h3 { font-size: 18px; margin-bottom: 16px; color: #333; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
+    .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    .group-card {
+      background: #fff; border-radius: 12px; padding: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    .group-card .group-img {
+      width: 100%; height: 120px; border-radius: 8px; overflow: hidden;
+      background: #f5f7ff; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 10px;
+    }
+    .group-card .group-img img { width: 100%; height: 100%; object-fit: cover; }
+    .group-card .group-img .placeholder { font-size: 36px; }
+    .group-card h4 { font-size: 15px; color: #333; margin-bottom: 4px; }
+    .group-card p { font-size: 12px; color: #999; margin-bottom: 10px; }
+    .group-card .group-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .qr-section { text-align: center; padding: 20px; }
+    .qr-section canvas { margin: 16px auto; }
+    .qr-url {
+      background: #fafafa; padding: 10px 16px; border-radius: 8px;
+      font-size: 13px; color: #667eea; word-break: break-all; margin-top: 12px;
+    }
+
+    .activity-select { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .activity-select select {
+      flex: 1; padding: 10px 14px;
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 8px;
+      color: #333; font-size: 14px; outline: none;
+    }
+
+    .toast-msg {
+      position: fixed; top: 20px; right: 20px; z-index: 9999;
+      padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
+      transform: translateX(120%); transition: transform 0.3s;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    .toast-msg.show { transform: translateX(0); }
+    .toast-msg.success { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+    .toast-msg.error { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+    .toast-msg.info { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+
+    @media (max-width: 768px) {
+      .sidebar { width: 60px; }
+      .sidebar .nav-text, .sidebar-logo h2 { display: none; }
+      .main-content { margin-left: 60px; padding: 16px; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .group-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+      <h2>🔐 后台管理</h2>
+      <p>扫码投票系统管理后台</p>
+      <input type="text" id="loginUser" placeholder="用户名" value="admin">
+      <input type="password" id="loginPass" placeholder="密码">
+      <button class="btn-login" onclick="doLogin()">登 录</button>
+      <div class="login-error" id="loginError"></div>
+    </div>
+  </div>
+
+  <div class="admin-app" id="adminApp">
+    <div class="layout">
+      <div class="sidebar">
+        <div class="sidebar-logo"><h2>投票系统</h2></div>
+        <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+          <span class="icon">📊</span><span class="nav-text">仪表盘</span>
+        </div>
+        <div class="nav-item" data-page="activities" onclick="switchPage('activities')">
+          <span class="icon">📋</span><span class="nav-text">活动管理</span>
+        </div>
+        <div class="nav-item" data-page="groups" onclick="switchPage('groups')">
+          <span class="icon">👥</span><span class="nav-text">候选组管理</span>
+        </div>
+        <div class="nav-item" data-page="control" onclick="switchPage('control')">
+          <span class="icon">🎮</span><span class="nav-text">投票控制</span>
+        </div>
+        <div class="nav-item" data-page="qrcode" onclick="switchPage('qrcode')">
+          <span class="icon">📱</span><span class="nav-text">二维码</span>
+        </div>
+        <div class="nav-item" data-page="results" onclick="switchPage('results')">
+          <span class="icon">🏆</span><span class="nav-text">投票结果</span>
+        </div>
+      </div>
+
+      <div class="main-content">
+        <div class="top-bar">
+          <h1 id="pageTitle">仪表盘</h1>
+          <div class="right-info">
+            <span>在线: <strong id="onlineCount">0</strong></span>
+            <span id="adminName">admin</span>
+            <button class="btn-logout" onclick="doLogout()">退出</button>
+          </div>
+        </div>
+
+        <div id="page-dashboard" class="page-content">
+          <div class="stats-grid">
+            <div class="stat-card"><div class="label">投票活动数</div><div class="value" id="statActivities">0</div></div>
+            <div class="stat-card"><div class="label">候选组总数</div><div class="value" id="statGroups">0</div></div>
+            <div class="stat-card"><div class="label">投票总记录</div><div class="value" id="statVotes">0</div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>最近投票记录</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>时间</th><th>活动</th><th>投票组</th><th>UUID</th><th>IP</th></tr></thead>
+                <tbody id="recentVotesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="page-activities" class="page-content" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>活动列表</h3>
+              <button class="btn btn-primary" onclick="showCreateActivity()">+ 新建活动</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>ID</th><th>名称</th><th>描述</th><th>状态</th><th>候选组</th><th>投票数</th><th>创建时间</th><th>操作</th></tr></thead>
+                <tbody id="activitiesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="page-groups" class="page-content" style="display:none;">
+          <div class="activity-select">
+            <span style="color:#666;font-size:13px;">选择活动:</span>
+            <select id="groupActivitySelect" onchange="loadGroups()"></select>
+            <button class="btn btn-primary" onclick="showAddGroup()">+ 添加候选组</button>
+          </div>
+          <div class="group-grid" id="groupGrid"></div>
+        </div>
+
+        <div id="page-control" class="page-content" style="display:none;">
+          <div class="activity-select">
+            <span style="color:#666;font-size:13px;">选择活动:</span>
+            <select id="controlActivitySelect" onchange="loadControlInfo()"></select>
+          </div>
+          <div class="card" id="controlCard">
+            <div class="card-header"><h3>投票控制</h3></div>
+            <div id="controlInfo" style="color:#999;">请选择活动</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" id="controlButtons"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>⚠️ 危险操作</h3></div>
+            <p style="color:#999;font-size:13px;margin-bottom:12px;">清空投票数据将删除该活动下的所有投票记录，此操作不可恢复。</p>
+            <button class="btn btn-danger" onclick="clearVotes()">🗑 清空投票数据</button>
+          </div>
+        </div>
+
+        <div id="page-qrcode" class="page-content" style="display:none;">
+          <div class="activity-select">
+            <span style="color:#666;font-size:13px;">选择活动:</span>
+            <select id="qrActivitySelect" onchange="generateQR()"></select>
+          </div>
+          <div class="card">
+            <div class="qr-section">
+              <h3 style="color:#333;margin-bottom:8px;">投票二维码</h3>
+              <p style="color:#999;font-size:13px;">学生扫描此二维码即可进入投票页面</p>
+              <canvas id="qrCanvas"></canvas>
+              <div class="qr-url" id="qrUrl"></div>
+              <div style="margin-top:14px;">
+                <button class="btn btn-primary" onclick="downloadQR()">📥 下载二维码</button>
+                <button class="btn btn-ghost" onclick="openVotePage()" style="margin-left:8px;">🔗 打开投票页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="page-results" class="page-content" style="display:none;">
+          <div class="activity-select">
+            <span style="color:#666;font-size:13px;">选择活动:</span>
+            <select id="resultActivitySelect" onchange="loadResults()"></select>
+            <button class="btn btn-ghost" onclick="exportResults()">📤 导出数据</button>
+          </div>
+          <div class="stats-grid" id="resultStats"></div>
+          <div class="card">
+            <div class="card-header"><h3>投票结果排行</h3></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>排名</th><th>组名</th><th>得票数</th><th>占比</th><th>进度条</th></tr></thead>
+                <tbody id="resultsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalContent"></div>
+  </div>
+  <div class="toast-msg" id="toastMsg"></div>
+
+  <script>
+    const API = '/admin';
+    let token = localStorage.getItem('admin_token') || '';
+    let activities = [];
+
+    function showToast(msg, type = 'success') {
+      const el = document.getElementById('toastMsg');
+      el.textContent = msg;
+      el.className = 'toast-msg ' + type + ' show';
+      setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    async function doLogin() {
+      const username = document.getElementById('loginUser').value.trim();
+      const password = document.getElementById('loginPass').value;
+      const errEl = document.getElementById('loginError');
+      try {
+        const res = await fetch(`${API}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const json = await res.json();
+        if (json.code === 0) {
+          token = json.data.token;
+          localStorage.setItem('admin_token', token);
+          document.getElementById('adminName').textContent = json.data.username;
+          enterApp();
+        } else { errEl.textContent = json.message; errEl.style.display = 'block'; }
+      } catch { errEl.textContent = '网络错误'; errEl.style.display = 'block'; }
+    }
+
+    function doLogout() {
+      token = ''; localStorage.removeItem('admin_token');
+      document.getElementById('loginOverlay').style.display = 'flex';
+      document.getElementById('adminApp').classList.remove('active');
+    }
+
+    async function enterApp() {
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('adminApp').classList.add('active');
+      await loadActivities();
+      loadDashboard();
+    }
+
+    async function checkAuth() {
+      if (!token) return;
+      try {
+        const res = await fetch(`${API}/stats`, { headers: { 'Authorization': 'Bearer ' + token } });
+        const json = await res.json();
+        if (json.code === 0) enterApp();
+        else { token = ''; localStorage.removeItem('admin_token'); }
+      } catch { token = ''; localStorage.removeItem('admin_token'); }
+    }
+
+    async function authFetch(url, options = {}) {
+      options.headers = { ...options.headers, 'Authorization': 'Bearer ' + token };
+      if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(options.body);
+      }
+      const res = await fetch(url, options);
+      const json = await res.json();
+      if (json.code === 401) { doLogout(); return null; }
+      return json;
+    }
+
+    function openModal(html) {
+      document.getElementById('modalContent').innerHTML = html;
+      document.getElementById('modalOverlay').classList.add('show');
+    }
+    function closeModal() { document.getElementById('modalOverlay').classList.remove('show'); }
+    document.getElementById('modalOverlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
+
+    const pageTitles = { dashboard: '仪表盘', activities: '活动管理', groups: '候选组管理', control: '投票控制', qrcode: '二维码', results: '投票结果' };
+
+    function switchPage(page) {
+      document.querySelectorAll('.page-content').forEach(el => el.style.display = 'none');
+      document.getElementById(`page-${page}`).style.display = 'block';
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+      document.getElementById('pageTitle').textContent = pageTitles[page];
+      if (page === 'dashboard') loadDashboard();
+      if (page === 'activities') loadActivities();
+      if (page === 'groups') populateSelects();
+      if (page === 'control') populateSelects();
+      if (page === 'qrcode') { populateSelects(); setTimeout(generateQR, 100); }
+      if (page === 'results') { populateSelects(); setTimeout(loadResults, 100); }
+    }
+
+    async function loadActivities() {
+      const json = await authFetch(`${API}/activities`);
+      if (!json || json.code !== 0) return;
+      activities = json.data;
+      populateSelects();
+      renderActivitiesTable();
+    }
+
+    function populateSelects() {
+      ['groupActivitySelect','controlActivitySelect','qrActivitySelect','resultActivitySelect'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const prev = el.value;
+        el.innerHTML = activities.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        if (prev) el.value = prev;
+        else if (activities.length) el.value = activities[0].id;
+      });
+    }
+
+    function renderActivitiesTable() {
+      document.getElementById('activitiesBody').innerHTML = activities.map(a => `
+        <tr>
+          <td>${a.id}</td><td>${a.name}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.description || '-'}</td>
+          <td><span class="tag tag-${a.status}">${{pending:'未开始',voting:'进行中',paused:'已暂停',ended:'已结束'}[a.status]}</span></td>
+          <td>${a.groupCount||0}</td><td>${a.voteCount||0}</td><td>${a.created_at||''}</td>
+          <td>
+            <button class="btn btn-ghost btn-sm" onclick="editActivity(${a.id})">编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteActivity(${a.id})">删除</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function showCreateActivity() {
+      openModal(`<h3>新建投票活动</h3>
+        <div class="form-group"><label>活动名称</label><input id="m_act_name" placeholder="如：十佳歌手评选"></div>
+        <div class="form-group"><label>活动描述</label><textarea id="m_act_desc" placeholder="可选"></textarea></div>
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="createActivity()">创建</button></div>`);
+    }
+
+    async function createActivity() {
+      const name = document.getElementById('m_act_name').value.trim();
+      const description = document.getElementById('m_act_desc').value.trim();
+      if (!name) return showToast('请输入活动名称', 'error');
+      const json = await authFetch(`${API}/activity`, { method: 'POST', body: { name, description } });
+      if (json && json.code === 0) { showToast('创建成功'); closeModal(); loadActivities(); }
+      else showToast(json?.message || '创建失败', 'error');
+    }
+
+    async function editActivity(id) {
+      const act = activities.find(a => a.id === id);
+      if (!act) return;
+      openModal(`<h3>编辑活动</h3>
+        <div class="form-group"><label>活动名称</label><input id="m_act_name" value="${act.name}"></div>
+        <div class="form-group"><label>活动描述</label><textarea id="m_act_desc">${act.description||''}</textarea></div>
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateActivity(${id})">保存</button></div>`);
+    }
+
+    async function updateActivity(id) {
+      const name = document.getElementById('m_act_name').value.trim();
+      const description = document.getElementById('m_act_desc').value.trim();
+      const json = await authFetch(`${API}/activity/${id}`, { method: 'PUT', body: { name, description } });
+      if (json && json.code === 0) { showToast('保存成功'); closeModal(); loadActivities(); }
+      else showToast(json?.message || '保存失败', 'error');
+    }
+
+    async function deleteActivity(id) {
+      if (!confirm('确定删除该活动？所有相关数据将被删除。')) return;
+      const json = await authFetch(`${API}/activity/${id}`, { method: 'DELETE' });
+      if (json && json.code === 0) { showToast('删除成功'); loadActivities(); }
+      else showToast(json?.message || '删除失败', 'error');
+    }
+
+    async function loadGroups() {
+      const actId = document.getElementById('groupActivitySelect').value;
+      if (!actId) return;
+      const json = await authFetch(`${API}/activity/${actId}/groups`);
+      if (!json || json.code !== 0) return;
+      const grid = document.getElementById('groupGrid');
+      if (!json.data.length) { grid.innerHTML = '<div style="color:#999;text-align:center;padding:40px;">暂无候选组</div>'; return; }
+      grid.innerHTML = json.data.map(g => `
+        <div class="group-card">
+          <div class="group-img">${g.image ? `<img src="${g.image}" alt="${g.name}">` : '<span class="placeholder">🎤</span>'}</div>
+          <h4>${g.name}</h4><p>${g.description || '暂无简介'}</p>
+          <div class="group-actions">
+            <button class="btn btn-ghost btn-sm" onclick="uploadImage(${g.id})">📷 上传图片</button>
+            <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id},'${encodeURIComponent(g.name)}','${encodeURIComponent(g.description||'')}')">✏️ 编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id})">🗑 删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showAddGroup() {
+      const actId = document.getElementById('groupActivitySelect').value;
+      if (!actId) return showToast('请先选择活动', 'error');
+      openModal(`<h3>添加候选组</h3>
+        <div class="form-group"><label>组名</label><input id="m_grp_name" placeholder="如：智慧门禁组"></div>
+        <div class="form-group"><label>简介</label><textarea id="m_grp_desc" placeholder="可选"></textarea></div>
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="addGroup(${actId})">添加</button></div>`);
+    }
+
+    async function addGroup(actId) {
+      const name = document.getElementById('m_grp_name').value.trim();
+      const description = document.getElementById('m_grp_desc').value.trim();
+      if (!name) return showToast('请输入组名', 'error');
+      const json = await authFetch(`${API}/activity/${actId}/group`, { method: 'POST', body: { name, description } });
+      if (json && json.code === 0) { showToast('添加成功'); closeModal(); loadGroups(); }
+      else showToast(json?.message || '添加失败', 'error');
+    }
+
+    async function editGroup(id, en, ed) {
+      openModal(`<h3>编辑候选组</h3>
+        <div class="form-group"><label>组名</label><input id="m_grp_name" value="${decodeURIComponent(en)}"></div>
+        <div class="form-group"><label>简介</label><textarea id="m_grp_desc">${decodeURIComponent(ed)}</textarea></div>
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="updateGroup(${id})">保存</button></div>`);
+    }
+
+    async function updateGroup(id) {
+      const name = document.getElementById('m_grp_name').value.trim();
+      const description = document.getElementById('m_grp_desc').value.trim();
+      const json = await authFetch(`${API}/group/${id}`, { method: 'PUT', body: { name, description } });
+      if (json && json.code === 0) { showToast('保存成功'); closeModal(); loadGroups(); }
+      else showToast(json?.message || '保存失败', 'error');
+    }
+
+    async function deleteGroup(id) {
+      if (!confirm('确定删除该候选组？')) return;
+      const json = await authFetch(`${API}/group/${id}`, { method: 'DELETE' });
+      if (json && json.code === 0) { showToast('删除成功'); loadGroups(); }
+      else showToast(json?.message || '删除失败', 'error');
+    }
+
+    function uploadImage(groupId) {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = 'image/*';
+      input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('image', file);
+        const res = await fetch(`${API}/group/${groupId}/image`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+        const json = await res.json();
+        if (json.code === 0) { showToast('上传成功'); loadGroups(); }
+        else showToast(json?.message || '上传失败', 'error');
+      };
+      input.click();
+    }
+
+    async function loadControlInfo() {
+      const actId = document.getElementById('controlActivitySelect').value;
+      if (!actId) return;
+      const json = await authFetch(`${API}/activities`);
+      if (!json) return;
+      const act = json.data.find(a => a.id == actId);
+      if (!act) return;
+      const statusText = { pending: '未开始', voting: '进行中', paused: '已暂停', ended: '已结束' };
+      document.getElementById('controlInfo').innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <strong style="font-size:18px;">${act.name}</strong>
+          <span class="tag tag-${act.status}">${statusText[act.status]}</span>
+        </div>
+        <div style="color:#999;font-size:13px;">候选组: ${act.groupCount||0} 个 | 投票数: ${act.voteCount||0} 条</div>`;
+      let html = '';
+      if (['pending','paused','ended'].includes(act.status)) html += `<button class="btn btn-success" onclick="setStatus(${actId},'voting')">▶ 开始投票</button>`;
+      if (act.status === 'voting') { html += `<button class="btn btn-warning" onclick="setStatus(${actId},'paused')">⏸ 暂停投票</button>`; html += `<button class="btn btn-danger" onclick="setStatus(${actId},'ended')">⏹ 结束投票</button>`; }
+      if (act.status === 'paused') html += `<button class="btn btn-danger" onclick="setStatus(${actId},'ended')">⏹ 结束投票</button>`;
+      document.getElementById('controlButtons').innerHTML = html;
+    }
+
+    async function setStatus(actId, status) {
+      const labels = { voting: '开始', paused: '暂停', ended: '结束' };
+      if (!confirm(`确定${labels[status]}投票？`)) return;
+      const json = await authFetch(`${API}/activity/${actId}/status`, { method: 'PUT', body: { status } });
+      if (json && json.code === 0) { showToast('操作成功'); loadControlInfo(); }
+      else showToast(json?.message || '操作失败', 'error');
+    }
+
+    async function clearVotes() {
+      const actId = document.getElementById('controlActivitySelect').value;
+      if (!actId) return;
+      if (!confirm('⚠️ 确定清空该活动所有投票数据？此操作不可恢复！')) return;
+      if (!confirm('再次确认：真的要清空吗？')) return;
+      const json = await authFetch(`${API}/activity/${actId}/votes`, { method: 'DELETE' });
+      if (json && json.code === 0) showToast(json.message);
+      else showToast(json?.message || '操作失败', 'error');
+    }
+
+    let currentQrUrl = '';
+    async function generateQR() {
+      const actId = document.getElementById('qrActivitySelect')?.value;
+      if (!actId) return;
+      const json = await authFetch(`${API.replace('/admin','/api')}/qrcode/${actId}`);
+      if (!json || json.code !== 0) return;
+      currentQrUrl = json.data.url;
+      document.getElementById('qrUrl').textContent = currentQrUrl;
+      QRCode.toCanvas(document.getElementById('qrCanvas'), currentQrUrl, { width: 280, margin: 2, color: { dark: '#333', light: '#ffffff' } });
+    }
+
+    function downloadQR() {
+      const canvas = document.getElementById('qrCanvas');
+      const link = document.createElement('a');
+      link.download = 'vote-qrcode.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function openVotePage() { if (currentQrUrl) window.open(currentQrUrl, '_blank'); }
+
+    async function loadResults() {
+      const actId = document.getElementById('resultActivitySelect')?.value;
+      if (!actId) return;
+      const json = await authFetch(`${API.replace('/admin','/api')}/results/${actId}`);
+      if (!json || json.code !== 0) return;
+      const data = json.data;
+      document.getElementById('resultStats').innerHTML = `
+        <div class="stat-card"><div class="label">总投票人数</div><div class="value">${data.totalVoters}</div></div>
+        <div class="stat-card"><div class="label">候选组数</div><div class="value">${data.leaderboard.length}</div></div>`;
+      document.getElementById('resultsBody').innerHTML = data.leaderboard.map((item, i) => `
+        <tr>
+          <td><strong style="color:${i<3?'#faad14':'#999'}">#${i+1}</strong></td>
+          <td>${item.name}</td>
+          <td><strong style="color:#667eea;">${item.votes}</strong></td>
+          <td>${item.percentage}%</td>
+          <td style="min-width:150px;"><div style="background:#f5f5f5;border-radius:4px;height:16px;overflow:hidden;"><div style="height:100%;width:${item.percentage}%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:4px;"></div></div></td>
+        </tr>`).join('');
+    }
+
+    async function exportResults() {
+      const actId = document.getElementById('resultActivitySelect')?.value;
+      if (!actId) return;
+      const json = await authFetch(`${API}/activity/${actId}/export`);
+      if (json && json.code === 0) {
+        const blob = new Blob([JSON.stringify(json.data, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.download = `vote-results-${actId}.json`;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        showToast('导出成功');
+      }
+    }
+
+    async function loadDashboard() {
+      const json = await authFetch(`${API}/stats`);
+      if (!json || json.code !== 0) return;
+      const d = json.data;
+      document.getElementById('statActivities').textContent = d.totalActivities;
+      document.getElementById('statGroups').textContent = d.totalGroups;
+      document.getElementById('statVotes').textContent = d.totalVotes;
+      document.getElementById('recentVotesBody').innerHTML = d.recentVotes.map(v => `
+        <tr><td>${v.created_at}</td><td>${v.activity_name||'-'}</td><td>${v.group_name||'-'}</td>
+        <td style="font-size:11px;color:#999;">${v.voter_uuid?.substring(0,8)}...</td>
+        <td style="font-size:11px;color:#999;">${v.voter_ip||'-'}</td></tr>
+      `).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">暂无记录</td></tr>';
+    }
+
+    const socket = io();
+    socket.on('onlineCount', (count) => { document.getElementById('onlineCount').textContent = count; });
+    socket.on('voteUpdate', () => {
+      if (document.getElementById('page-dashboard').style.display !== 'none') loadDashboard();
+      if (document.getElementById('page-results').style.display !== 'none') loadResults();
+    });
+
+    document.getElementById('loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    checkAuth();
+  </script>
+</body>
+</html>

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>投票大屏展示</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .screen-container {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: 20px 30px;
+      gap: 16px;
+    }
+
+    /* Header */
+    .screen-header {
+      text-align: center;
+      padding: 10px 0;
+    }
+    .screen-header h1 {
+      font-size: 36px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 2px;
+    }
+    .header-stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 10px;
+    }
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      color: #666;
+    }
+    .stat-item .num {
+      font-size: 28px;
+      font-weight: 700;
+      color: #667eea;
+      font-variant-numeric: tabular-nums;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .status-badge.voting { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+    .status-badge.pending { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+    .status-badge.paused { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+    .status-badge.ended { background: #fff2f0; color: #cf1322; border: 1px solid #ffa39e; }
+
+    /* Main content */
+    .screen-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      min-height: 0;
+    }
+
+    .panel {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #667eea;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Ranking */
+    .rank-list { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+    .rank-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 16px;
+      background: #fafafa;
+      border-radius: 12px;
+      border: 2px solid transparent;
+      transition: all 0.5s ease;
+    }
+    .rank-item.rank-1 { background: #fffbe6; border-color: #ffe58f; }
+    .rank-item.rank-2 { background: #f6f6f6; border-color: #d9d9d9; }
+    .rank-item.rank-3 { background: #fff7e6; border-color: #ffd591; }
+    .rank-num {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .rank-1 .rank-num { background: linear-gradient(135deg, #faad14, #d48806); color: #fff; }
+    .rank-2 .rank-num { background: linear-gradient(135deg, #8c8c8c, #595959); color: #fff; }
+    .rank-3 .rank-num { background: linear-gradient(135deg, #d48806, #ad6800); color: #fff; }
+    .rank-num.default { background: #f0f5ff; color: #667eea; }
+    .rank-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #333;
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rank-bar-wrap { flex: 2; min-width: 0; }
+    .rank-bar-bg {
+      height: 24px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .rank-bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.8s ease;
+      min-width: 2px;
+    }
+    .rank-1 .rank-bar-fill { background: linear-gradient(90deg, #faad14, #d48806); }
+    .rank-2 .rank-bar-fill { background: linear-gradient(90deg, #8c8c8c, #595959); }
+    .rank-3 .rank-bar-fill { background: linear-gradient(90deg, #d48806, #ad6800); }
+    .rank-bar-fill.default { background: linear-gradient(90deg, #667eea, #764ba2); }
+    .rank-votes {
+      font-size: 20px;
+      font-weight: 700;
+      color: #667eea;
+      width: 60px;
+      text-align: right;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .rank-pct {
+      font-size: 12px;
+      color: #999;
+      width: 50px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .chart-wrap { flex: 1; position: relative; min-height: 0; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .rank-item { animation: slideIn 0.4s ease forwards; }
+    .flash-update { animation: flashBorder 0.6s ease; }
+    @keyframes flashBorder {
+      0% { border-color: #667eea; box-shadow: 0 0 15px rgba(102,126,234,0.2); }
+      100% { border-color: transparent; box-shadow: none; }
+    }
+
+    .fullscreen-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      background: #fff;
+      border: 1px solid #d9d9d9;
+      color: #667eea;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .fullscreen-btn:hover { border-color: #667eea; }
+  </style>
+</head>
+<body>
+  <div class="screen-container">
+    <div class="screen-header">
+      <h1 id="activityName">投票大屏展示</h1>
+      <div class="header-stats">
+        <div class="stat-item">
+          <span>在线人数</span>
+          <span class="num" id="onlineCount">0</span>
+        </div>
+        <div class="stat-item">
+          <span>投票人数</span>
+          <span class="num" id="totalVotes">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="status-badge" id="statusBadge">加载中</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-body">
+      <div class="panel">
+        <div class="panel-title">🏆 实时排行榜</div>
+        <div class="rank-list" id="rankList">
+          <div style="text-align:center;padding:40px;color:#999;">加载中...</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div class="panel" style="flex:1;">
+          <div class="panel-title">📊 得票分布</div>
+          <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+        </div>
+        <div class="panel" style="flex:1;">
+          <div class="panel-title">🍩 得票占比</div>
+          <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="fullscreen-btn" onclick="toggleFullscreen()">⛶ 全屏</button>
+
+  <script>
+    const API = '/api';
+    let currentActivity = null;
+    let barChart = null;
+    let pieChart = null;
+    let previousRanks = {};
+
+    const chartColors = ['#667eea','#764ba2','#f59e0b','#10b981','#ef4444','#06b6d4','#ec4899','#8b5cf6','#14b8a6','#f97316','#84cc16','#6366f1'];
+    const statusMap = { pending: '⏳ 未开始', voting: '🟢 进行中', paused: '⏸ 已暂停', ended: '🔴 已结束' };
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+      else document.exitFullscreen();
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch(`${API}/activity`);
+        const json = await res.json();
+        if (json.code !== 0 || !json.data) return;
+        currentActivity = json.data.activity;
+        document.getElementById('activityName').textContent = currentActivity.name;
+        const badge = document.getElementById('statusBadge');
+        badge.textContent = statusMap[currentActivity.status] || currentActivity.status;
+        badge.className = 'status-badge ' + currentActivity.status;
+        const resultsRes = await fetch(`${API}/results/${currentActivity.id}`);
+        const resultsJson = await resultsRes.json();
+        if (resultsJson.code === 0) updateDisplay(resultsJson.data);
+      } catch (err) { console.error('加载失败:', err); }
+    }
+
+    function updateDisplay(data) {
+      document.getElementById('totalVotes').textContent = data.totalVoters;
+      renderRanking(data.leaderboard);
+      renderBarChart(data.leaderboard);
+      renderPieChart(data.leaderboard);
+    }
+
+    function renderRanking(leaderboard) {
+      const container = document.getElementById('rankList');
+      const maxVotes = Math.max(...leaderboard.map(l => l.votes), 1);
+      container.innerHTML = leaderboard.map((item, i) => {
+        const rank = i + 1;
+        const rankClass = rank <= 3 ? `rank-${rank}` : '';
+        const numClass = rank <= 3 ? '' : 'default';
+        const barClass = rank <= 3 ? '' : 'default';
+        const prevRank = previousRanks[item.id];
+        let rankChange = '';
+        if (prevRank !== undefined && prevRank !== rank) {
+          rankChange = prevRank > rank
+            ? `<span style="color:#52c41a;font-size:11px;">↑${prevRank - rank}</span>`
+            : `<span style="color:#ff4d4f;font-size:11px;">↓${rank - prevRank}</span>`;
+        }
+        return `
+          <div class="rank-item ${rankClass}" data-id="${item.id}">
+            <div class="rank-num ${numClass}">${rank}</div>
+            <div class="rank-name">${item.name} ${rankChange}</div>
+            <div class="rank-bar-wrap">
+              <div class="rank-bar-bg">
+                <div class="rank-bar-fill ${barClass}" style="width:${(item.votes / maxVotes * 100) || 0}%"></div>
+              </div>
+            </div>
+            <div class="rank-votes">${item.votes}</div>
+            <div class="rank-pct">${item.percentage}%</div>
+          </div>`;
+      }).join('');
+      leaderboard.forEach((item, i) => { previousRanks[item.id] = i + 1; });
+    }
+
+    function renderBarChart(leaderboard) {
+      const ctx = document.getElementById('barChart').getContext('2d');
+      const labels = leaderboard.map(l => l.name);
+      const votes = leaderboard.map(l => l.votes);
+      const colors = leaderboard.map((_, i) => chartColors[i % chartColors.length]);
+      if (barChart) {
+        barChart.data.labels = labels;
+        barChart.data.datasets[0].data = votes;
+        barChart.data.datasets[0].backgroundColor = colors.map(c => c + '99');
+        barChart.data.datasets[0].borderColor = colors;
+        barChart.update('none');
+        return;
+      }
+      barChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ label: '得票数', data: votes, backgroundColor: colors.map(c => c + '99'), borderColor: colors, borderWidth: 1, borderRadius: 6, borderSkipped: false }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { color: '#999', stepSize: 1 }, grid: { color: '#f5f5f5' } },
+            x: { ticks: { color: '#666' }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function renderPieChart(leaderboard) {
+      const ctx = document.getElementById('pieChart').getContext('2d');
+      const labels = leaderboard.map(l => l.name);
+      const votes = leaderboard.map(l => l.votes);
+      const colors = leaderboard.map((_, i) => chartColors[i % chartColors.length]);
+      if (pieChart) {
+        pieChart.data.labels = labels;
+        pieChart.data.datasets[0].data = votes;
+        pieChart.data.datasets[0].backgroundColor = colors.map(c => c + 'cc');
+        pieChart.update('none');
+        return;
+      }
+      pieChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{ data: votes, backgroundColor: colors.map(c => c + 'cc'), borderColor: '#fff', borderWidth: 2, hoverOffset: 8 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: { duration: 600 }, cutout: '55%',
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#666', padding: 12, usePointStyle: true, font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  return ` ${ctx.label}: ${ctx.raw} 票 (${total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    const socket = io();
+    socket.on('onlineCount', (count) => { document.getElementById('onlineCount').textContent = count; });
+    socket.on('voteUpdate', (data) => {
+      updateDisplay(data);
+      document.querySelectorAll('.rank-item').forEach(el => { el.classList.remove('flash-update'); void el.offsetWidth; el.classList.add('flash-update'); });
+    });
+    socket.on('statusChange', (data) => { if (currentActivity && data.activityId === currentActivity.id) loadData(); });
+    socket.on('voteReset', (data) => { if (currentActivity && data.activityId === currentActivity.id) { previousRanks = {}; loadData(); } });
+
+    document.addEventListener('keydown', (e) => { if (e.key === 'f' || e.key === 'F') toggleFullscreen(); });
+    loadData();
+    setInterval(loadData, 30000);
+  </script>
+</body>
+</html>

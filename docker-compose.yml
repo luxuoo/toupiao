@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  vote-app:
+    build: .
+    container_name: vote-system
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./public/uploads:/app/public/uploads
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/app/data/vote.db
+      - JWT_SECRET=your-secret-key-change-this
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: vote-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - vote-app
+    restart: unless-stopped
