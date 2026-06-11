@@ -123,7 +123,11 @@
       margin-bottom: 10px;
     }
     .group-card .group-img img { width: 100%; height: 100%; object-fit: cover; }
-    .group-card .group-img .placeholder { font-size: 13px; color: #bbb; }
+    .group-card .group-img .initial {
+      font-size: 28px;
+      font-weight: 700;
+      color: #667eea;
+    }
     .group-card h4 { font-size: 15px; color: #333; margin-bottom: 4px; }
     .group-card p { font-size: 12px; color: #999; margin-bottom: 10px; }
     .group-card .group-actions { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -428,7 +432,7 @@
       if (!json.data.length) { grid.innerHTML = '<div style="color:#999;text-align:center;padding:40px;">暂无候选组</div>'; return; }
       grid.innerHTML = json.data.map(g => `
         <div class="group-card">
-          <div class="group-img">${g.image ? `<img src="${g.image}" alt="${g.name}">` : '<span class="placeholder">暂无图片</span>'}</div>
+          <div class="group-img">${g.image ? `<img src="${g.image}" alt="${g.name}">` : `<span class="initial">${g.name.charAt(0)}</span>`}</div>
           <h4>${g.name}</h4><p>${g.description || '暂无简介'}</p>
           <div class="group-actions">
             <button class="btn btn-ghost btn-sm" onclick="uploadImage(${g.id})">上传图片</button>
