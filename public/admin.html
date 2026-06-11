@@ -542,9 +542,7 @@
     async function generateQR() {
       const actId = document.getElementById('qrActivitySelect')?.value;
       if (!actId) return;
-      const json = await authFetch(`${API.replace('/admin','/api')}/qrcode/${actId}`);
-      if (!json || json.code !== 0) return;
-      currentQrUrl = json.data.url;
+      currentQrUrl = `${location.protocol}//${location.host}/vote.html?activity=${actId}`;
       document.getElementById('qrUrl').textContent = currentQrUrl;
       QRCode.toCanvas(document.getElementById('qrCanvas'), currentQrUrl, { width: 280, margin: 2, color: { dark: '#333', light: '#ffffff' } });
     }
