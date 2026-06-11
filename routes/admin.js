@@ -76,7 +76,7 @@ router.put('/activity/:id', async (req, res) => {
   try {
     const { name, description } = req.body;
     await run(
-      'UPDATE activities SET name = COALESCE(?, name), description = COALESCE(?, description), updated_at = datetime("now","localtime") WHERE id = ?',
+      `UPDATE activities SET name = COALESCE(?, name), description = COALESCE(?, description), updated_at = datetime('now','localtime') WHERE id = ?`,
       [name, description, req.params.id]
     );
     res.json({ code: 0, message: '更新成功' });
@@ -103,7 +103,7 @@ router.put('/activity/:id/status', async (req, res) => {
       return res.json({ code: 400, message: '无效的状态' });
     }
     await run(
-      'UPDATE activities SET status = ?, updated_at = datetime("now","localtime") WHERE id = ?',
+      `UPDATE activities SET status = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
       [status, req.params.id]
     );
     // Broadcast status change
