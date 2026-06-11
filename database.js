@@ -1,4 +1,4 @@
-const sqlite3 = require('sqlite3').verbose();
+const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
@@ -10,41 +10,50 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const db = new sqlite3.Database(DB_PATH);
+const db = new DatabaseSync(DB_PATH);
 
-// Promisify db methods
+// Enable WAL mode for better concurrent read performance
+db.exec('PRAGMA journal_mode=WAL');
+db.exec('PRAGMA foreign_keys=ON');
+
+// Promisify-style wrappers (node:sqlite is synchronous, wrap in promises for API compatibility)
 function run(sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve({ lastID: this.lastID, changes: this.changes });
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const result = stmt.run(...params);
+      resolve({ lastID: Number(result.lastInsertRowid), changes: result.changes });
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 function get(sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const row = stmt.get(...params);
+      resolve(row);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 function all(sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const rows = stmt.all(...params);
+      resolve(rows);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 async function initDatabase() {
-  // Enable WAL mode for better concurrent read performance
-  await run('PRAGMA journal_mode=WAL');
-  await run('PRAGMA foreign_keys=ON');
-
   // Activity table
   await run(`
     CREATE TABLE IF NOT EXISTS activities (

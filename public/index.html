@@ -185,6 +185,18 @@
                 width: 90%;
             }
         }
+        .admin-entry {
+            position: fixed;
+            bottom: 12px;
+            right: 16px;
+            font-size: 18px;
+            color: #ccc;
+            opacity: 0.18;
+            text-decoration: none;
+            z-index: 999;
+            transition: opacity 0.2s;
+        }
+        .admin-entry:hover { opacity: 0.6; }
     </style>
 </head>
 <body>
@@ -215,6 +227,8 @@
             <div class="score-list" id="scoreList"></div>
         </div>
     </div>
+
+    <a href="/admin.html" class="admin-entry" title="设置">⚙</a>
 
     <script>
         const studentList = [

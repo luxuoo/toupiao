@@ -7,63 +7,34 @@
 - 🎯 **随机点名** - 首页支持小组随机点名、+1 加分、排行榜
 - 🗳️ **扫码投票** - 手机扫码即可投票，适配各种移动设备
 - 🖥️ **大屏展示** - 实时投票结果、排行榜、柱状图、饼图
-- ⚙️ **后台管理** - 活动管理、候选组管理、投票控制、数据导出（入口隐藏在投票页右下角）
+- ⚙️ **后台管理** - 活动管理、候选组管理、投票控制、数据导出（入口隐藏在点名首页右下角）
 - 🔒 **防刷票** - UUID + IP 双重验证
 - ⚡ **实时推送** - Socket.IO 实时数据更新
-- 🐳 **一键部署** - Docker + Nginx，提供部署脚本
+- 🐳 **多种部署** - 支持宝塔面板、Docker、直接运行
 
 ## 技术栈
 
 - **前端**: HTML + CSS + JavaScript + Chart.js + Socket.IO Client
 - **后端**: Node.js + Express + Socket.IO
-- **数据库**: SQLite
-- **部署**: Docker + Nginx
+- **数据库**: SQLite（使用 Node.js 内置 `node:sqlite` 模块，无额外依赖）
+- **部署**: 宝塔面板 / Docker + Nginx
+
+## 环境要求
+
+- **Node.js >= 22.5**（需要内置的 `node:sqlite` 模块）
 
 ## 页面说明
 
 | 页面 | 地址 | 说明 |
 |------|------|------|
-| 首页（点名） | `/` | 随机点名加分，点击「进入投票」跳转 |
-| 投票页面 | `/vote.html` | 手机扫码投票，右下角 ⚙ 隐藏入口进入后台 |
+| 首页（点名） | `/` | 随机点名加分，右下角 ⚙ 隐藏入口进入后台 |
+| 投票页面 | `/vote.html` | 手机扫码投票 |
 | 大屏展示 | `/screen.html` | 实时投票结果大屏，按 F 全屏 |
-| 后台管理 | `/admin.html` | 活动/候选组/投票控制管理（无密码，通过隐藏入口访问） |
+| 后台管理 | `/admin.html` | 活动/候选组/投票控制管理 |
 
-> 后台管理入口不直接暴露，需从投票页面右下角的齿轮图标（⚙）进入。
+> 后台管理入口不直接暴露，需从点名首页右下角的齿轮图标（⚙）进入。
 
-## 快速开始
-
-### 方式一：Docker 部署（推荐）
-
-```bash
-# 1. 克隆代码
-git clone <仓库地址>
-cd toupiao
-
-# 2. 一键部署
-chmod +x deploy.sh
-./deploy.sh
-```
-
-部署完成后访问 `http://你的服务器IP`。
-
-如需配置域名，修改 `nginx.conf` 中的 `server_name`：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;  # 改为你的域名
-    ...
-}
-```
-
-然后重新部署：
-
-```bash
-docker compose down
-docker compose up -d
-```
-
-### 方式二：直接运行
+## 快速开始（本地开发）
 
 ```bash
 # 安装依赖
@@ -73,27 +44,91 @@ npm install
 npm start
 ```
 
-访问 `http://localhost:3000`
+访问 `http://localhost:7070`
 
-## 服务器部署步骤
+---
+
+## 部署方案一：宝塔面板（推荐）
+
+### 1. 安装 Node.js
+
+宝塔面板 → **软件商店** → 搜索 **Node.js版本管理器** → 安装 → 安装 **Node.js 22.x** 或更高版本。
+
+### 2. 上传代码
+
+在宝塔文件管理中创建目录：
+
+```
+/www/wwwroot/vote-system/
+```
+
+上传项目文件（`node_modules`、`data`、`.git` 不用传）。
+
+或用 Git 拉取：
+
+```bash
+cd /www/wwwroot/
+git clone https://你的仓库地址.git vote-system
+```
+
+### 3. 安装依赖并启动
+
+```bash
+cd /www/wwwroot/vote-system
+npm install --production
+npm install -g pm2
+pm2 start server.js --name vote-system
+pm2 save
+pm2 startup
+```
+
+### 4. 配置 Nginx 反向代理
+
+宝塔面板 → **网站** → **添加站点**（填域名，PHP 选纯静态）→ 站点设置 → **反向代理** → 添加：
+
+- 代理名称：`vote`
+- 目标URL：`http://127.0.0.1:7070`
+
+然后点 **配置文件**，替换为：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:7070;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+### 5. 访问
+
+| 页面 | 地址 |
+|------|------|
+| 点名首页 | `http://你的域名/` |
+| 投票页面 | `http://你的域名/vote.html` |
+| 大屏展示 | `http://你的域名/screen.html` |
+| 后台管理 | `http://你的域名/admin.html` |
+
+---
+
+## 部署方案二：Docker
 
 ### 1. 准备环境
 
-确保服务器已安装：
-- Docker
-- Docker Compose
+确保服务器已安装 Docker 和 Docker Compose。
 
 ### 2. 上传代码
 
 ```bash
-# 方式 A：Git 拉取
 git clone <仓库地址>
 cd toupiao
-
-# 方式 B：直接上传项目文件夹到服务器
 ```
 
-### 3. 部署启动
+### 3. 一键部署
 
 ```bash
 chmod +x deploy.sh
@@ -109,39 +144,112 @@ docker compose up -d
 ### 4. 验证服务
 
 ```bash
-# 查看容器状态
-docker compose ps
-
-# 查看日志
-docker compose logs -f
+docker compose ps       # 查看容器状态
+docker compose logs -f  # 查看日志
 ```
 
-### 5. 访问系统
+### 5. 配置域名（可选）
 
-- 首页：`http://服务器IP/`
-- 投票：`http://服务器IP/vote.html`
-- 大屏：`http://服务器IP/screen.html`
-- 后台：从投票页右下角 ⚙ 进入
+修改 `nginx.conf` 中的 `server_name`：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;  # 改为你的域名
+    ...
+}
+```
+
+重新部署：
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+---
+
+## 代码更新方案
+
+### 方案 A：Git 更新（推荐）
+
+SSH 进入服务器执行：
+
+```bash
+cd /www/wwwroot/vote-system
+git pull origin master
+npm install --production
+pm2 restart vote-system
+```
+
+**一键更新脚本**：在服务器创建 `update.sh`：
+
+```bash
+#!/bin/bash
+cd /www/wwwroot/vote-system
+echo ">>> 拉取最新代码..."
+git pull origin master
+echo ">>> 安装依赖..."
+npm install --production
+echo ">>> 重启服务..."
+pm2 restart vote-system
+echo ">>> 更新完成！"
+```
+
+以后更新只需：
+
+```bash
+bash /www/wwwroot/vote-system/update.sh
+```
+
+### 方案 B：手动上传更新
+
+1. 本地改好代码
+2. 用宝塔文件管理器或 SFTP 上传修改过的文件到 `/www/wwwroot/vote-system/`
+3. SSH 重启服务：`pm2 restart vote-system`
+
+### 方案 C：Docker 更新
+
+```bash
+cd /www/wwwroot/vote-system
+git pull origin master
+docker compose down
+docker compose up -d --build
+```
+
+> ⚠️ **注意**：更新代码时不要覆盖 `data/vote.db` 和 `public/uploads/`，否则投票数据和上传的图片会丢失。
+
+---
 
 ## 使用流程
 
 1. 访问首页 `/`，使用点名功能
-2. 点击「进入投票」跳转到投票页面
-3. 投票页右下角点击 ⚙ 进入后台管理
-4. 在后台创建活动 → 添加候选组 → 开始投票
-5. 生成二维码，扫码投票
-6. 大屏 `/screen.html` 实时展示投票结果
+2. 首页右下角点击 ⚙ 进入后台管理
+3. 在后台创建活动 → 添加候选组 → 开始投票
+4. 生成二维码，扫码投票
+5. 大屏 `/screen.html` 实时展示投票结果
+
+## PM2 常用命令
+
+```bash
+pm2 list              # 查看所有进程状态
+pm2 logs vote-system  # 查看日志
+pm2 restart vote-system  # 重启
+pm2 stop vote-system     # 停止
+pm2 delete vote-system   # 删除进程
+```
 
 ## 项目结构
 
 ```
 ├── server.js            # 服务端入口
-├── database.js          # 数据库初始化
+├── database.js          # 数据库初始化（使用 Node.js 内置 node:sqlite）
 ├── package.json         # 项目依赖
 ├── Dockerfile           # Docker 镜像配置
 ├── docker-compose.yml   # Docker Compose 编排
 ├── nginx.conf           # Nginx 反向代理配置
 ├── deploy.sh            # 一键部署脚本
+├── update.sh            # 一键更新脚本
 ├── routes/
 │   ├── api.js           # 公开 API（投票、结果等）
 │   └── admin.js         # 管理 API（活动、候选组管理）

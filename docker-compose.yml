@@ -5,13 +5,13 @@ services:
     build: .
     container_name: vote-system
     ports:
-      - "3000:3000"
+      - "7070:7070"
     volumes:
       - ./data:/app/data
       - ./public/uploads:/app/public/uploads
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=7070
       - DB_PATH=/app/data/vote.db
       - JWT_SECRET=your-secret-key-change-this
     restart: unless-stopped
