@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>投票大屏展示</title>
   <script src="/lib/chart.umd.min.js"></script>
+  <script src="/lib/qrcode.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -172,6 +173,31 @@
 
     .chart-wrap { flex: 1; position: relative; min-height: 0; }
 
+    /* QR Code panel */
+    .qr-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .qr-panel canvas {
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .qr-tip {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      text-align: center;
+    }
+    .qr-tip .icon { font-size: 28px; display: block; margin-bottom: 4px; }
+    .qr-hint {
+      font-size: 13px;
+      color: #999;
+      text-align: center;
+    }
+
     @keyframes slideIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
@@ -231,9 +257,10 @@
           <div class="panel-title">📊 得票分布</div>
           <div class="chart-wrap"><canvas id="barChart"></canvas></div>
         </div>
-        <div class="panel" style="flex:1;">
-          <div class="panel-title">🍩 得票占比</div>
-          <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+        <div class="panel qr-panel">
+          <div class="qr-tip"><span class="icon">📱</span>扫码投票</div>
+          <canvas id="qrCanvas" width="200" height="200"></canvas>
+          <div class="qr-hint">使用手机扫描二维码参与投票</div>
         </div>
       </div>
     </div>
@@ -245,7 +272,6 @@
     const API = '/api';
     let currentActivity = null;
     let barChart = null;
-    let pieChart = null;
     let previousRanks = {};
 
     const chartColors = ['#667eea','#764ba2','#f59e0b','#10b981','#ef4444','#06b6d4','#ec4899','#8b5cf6','#14b8a6','#f97316','#84cc16','#6366f1'];
@@ -254,6 +280,17 @@
     function toggleFullscreen() {
       if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
       else document.exitFullscreen();
+    }
+
+    async function loadQRCode(activityId) {
+      try {
+        const voteUrl = `${location.protocol}//${location.host}/vote.html?activity=${activityId}`;
+        await QRCode.toCanvas(document.getElementById('qrCanvas'), voteUrl, {
+          width: 200,
+          margin: 2,
+          color: { dark: '#333', light: '#ffffff' }
+        });
+      } catch (err) { console.error('二维码生成失败:', err); }
     }
 
     async function loadData() {
@@ -266,6 +303,7 @@
         const badge = document.getElementById('statusBadge');
         badge.textContent = statusMap[currentActivity.status] || currentActivity.status;
         badge.className = 'status-badge ' + currentActivity.status;
+        loadQRCode(currentActivity.id);
         const resultsRes = await fetch(`${API}/results/${currentActivity.id}`);
         const resultsJson = await resultsRes.json();
         if (resultsJson.code === 0) updateDisplay(resultsJson.data);
@@ -276,7 +314,6 @@
       document.getElementById('totalVotes').textContent = data.totalVoters;
       renderRanking(data.leaderboard);
       renderBarChart(data.leaderboard);
-      renderPieChart(data.leaderboard);
     }
 
     function renderRanking(leaderboard) {
@@ -335,41 +372,6 @@
           scales: {
             y: { beginAtZero: true, ticks: { color: '#999', stepSize: 1 }, grid: { color: '#f5f5f5' } },
             x: { ticks: { color: '#666' }, grid: { display: false } }
-          }
-        }
-      });
-    }
-
-    function renderPieChart(leaderboard) {
-      const ctx = document.getElementById('pieChart').getContext('2d');
-      const labels = leaderboard.map(l => l.name);
-      const votes = leaderboard.map(l => l.votes);
-      const colors = leaderboard.map((_, i) => chartColors[i % chartColors.length]);
-      if (pieChart) {
-        pieChart.data.labels = labels;
-        pieChart.data.datasets[0].data = votes;
-        pieChart.data.datasets[0].backgroundColor = colors.map(c => c + 'cc');
-        pieChart.update('none');
-        return;
-      }
-      pieChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels,
-          datasets: [{ data: votes, backgroundColor: colors.map(c => c + 'cc'), borderColor: '#fff', borderWidth: 2, hoverOffset: 8 }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false, animation: { duration: 600 }, cutout: '55%',
-          plugins: {
-            legend: { position: 'bottom', labels: { color: '#666', padding: 12, usePointStyle: true, font: { size: 11 } } },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => {
-                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                  return ` ${ctx.label}: ${ctx.raw} 票 (${total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0}%)`;
-                }
-              }
-            }
           }
         }
       });
